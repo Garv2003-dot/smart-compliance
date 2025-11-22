@@ -1,0 +1,74 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: smartcom
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - smartcom_db:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+
+  minio:
+    image: minio/minio:RELEASE.2025-01-01T00-00-00Z
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio_data:/data
+
+  backend:
+    build:
+      context: ../
+      dockerfile: backend/Dockerfile
+    env_file:
+      - ../backend/.env
+    ports:
+      - '8000:8000'
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    volumes:
+      - ../backend:/app
+
+  worker:
+    build:
+      context: ../
+      dockerfile: services/worker/Dockerfile
+    env_file:
+      - ../backend/.env
+    depends_on:
+      - redis
+      - postgres
+    volumes:
+      - ../backend:/app
+    # If you don't have a worker yet you can remove this service.
+
+  frontend:
+    build:
+      context: ../
+      dockerfile: frontend/Dockerfile
+    env_file:
+      - ../frontend/.env
+    ports:
+      - '3000:3000'
+    depends_on:
+      - backend
+    volumes:
+      - ../frontend:/app
+
+volumes:
+  smartcom_db:
+  minio_data:
